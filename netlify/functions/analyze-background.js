@@ -68,7 +68,7 @@ JSON à remplir (TOUS les champs, analyses précises et concrètes):
     const a = JSON.parse(raw);
 
     // 3. Stockage du résultat (TTL 1h)
-    const store = getStore('diagnostics');
+    const store = getStore({ name: 'diagnostics', siteID: process.env.SITE_ID, token: process.env.NETLIFY_TOKEN });
     await store.set(jobId, JSON.stringify(a), {
       expiration: Math.floor(Date.now() / 1000) + 3600
     });
