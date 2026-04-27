@@ -428,7 +428,7 @@ async function sendEmails(a, email, linkedin_url) {
     await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
       subject: `Nouveau diagnostic — ${email}`,
       message: `<p><strong>Nouveau diagnostic soumis</strong></p><p>Email : ${email}<br>Profil : <a href="${linkedin_url}">${linkedin_url}</a><br>Date : ${new Date().toLocaleString('fr-FR')}</p><hr style="border:none;border-top:1px solid #e8e4dc;margin:20px 0;">` + analysisHTML,
-      to_email: 'laurent@sherpact.com'
+      to_email: 'thomas.servais@servais-consulting.com'
     });
   } catch(e) {
     console.error('Email Laurent:', e);
