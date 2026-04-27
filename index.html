@@ -443,6 +443,34 @@ async function sendEmails(a, email, linkedin_url) {
   }
 }
 
+async function pollResult(jobId, email, linkedin_url) {
+  const INTERVAL = 3000;
+  const TIMEOUT = 5 * 60 * 1000; // 5 min max
+  const start = Date.now();
+
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      if (Date.now() - start > TIMEOUT) {
+        reject(new Error('Délai dépassé, veuillez réessayer.'));
+        return;
+      }
+      try {
+        const r = await fetch(`/.netlify/functions/status?id=${jobId}`);
+        const data = await r.json();
+        if (data.ready) {
+          renderResults(data.analysis, email, linkedin_url);
+          resolve();
+        } else {
+          setTimeout(tick, INTERVAL);
+        }
+      } catch(e) {
+        setTimeout(tick, INTERVAL);
+      }
+    };
+    setTimeout(tick, INTERVAL);
+  });
+}
+
 async function handleSubmit() {
   const email = document.getElementById('emailInput').value.trim();
   const url = document.getElementById('urlInput').value.trim();
@@ -455,17 +483,17 @@ async function handleSubmit() {
   document.getElementById('loadingSection').style.display = 'flex';
 
   try {
+    const jobId = crypto.randomUUID();
+
     const resp = await fetch('/.netlify/functions/analyze-background', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ linkedin_url: url, email })
+      body: JSON.stringify({ linkedin_url: url, email, jobId })
     });
 
     if (resp.status !== 202) throw new Error(`Erreur serveur (${resp.status})`);
 
-    document.getElementById('loadingSection').style.display = 'none';
-    document.getElementById('confirmEmail').textContent = email;
-    document.getElementById('confirmSection').style.display = 'flex';
+    await pollResult(jobId, email, url);
 
   } catch(err) {
     document.getElementById('loadingSection').style.display = 'none';
