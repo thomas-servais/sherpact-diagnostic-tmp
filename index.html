@@ -447,7 +447,7 @@ async function handleSubmit() {
   document.getElementById('loadingSection').style.display = 'flex';
 
   try {
-    const resp = await fetch('/.netlify/functions/analyze', {
+    const resp = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ linkedin_url: url, email })
