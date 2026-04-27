@@ -1,10 +1,5 @@
 [build]
   functions = "netlify/functions"
-  edge_functions = "netlify/edge-functions"
-
-[[edge_functions]]
-  function = "analyze"
-  path = "/api/analyze"
 
 [[headers]]
   for = "/*"
