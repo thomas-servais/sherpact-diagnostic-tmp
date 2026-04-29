@@ -4,7 +4,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return;
 
   try {
-    const { linkedin_url, jobId } = JSON.parse(event.body);
+    const { linkedin_url, email, jobId } = JSON.parse(event.body);
     if (!jobId) throw new Error('Missing jobId');
 
     // 1. RapidAPI scrape
@@ -73,7 +73,69 @@ JSON à remplir (TOUS les champs, analyses précises et concrètes):
       expiration: Math.floor(Date.now() / 1000) + 3600
     });
 
+    // 4. Envoi email via Resend
+    await sendResend(email, a, linkedin_url);
+
   } catch (err) {
     console.error('analyze-background error:', err);
   }
 };
+
+async function sendResend(email, a, linkedin_url) {
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM || 'Sherpact <diagnostic@sherpact.com>',
+      to: email,
+      subject: `Votre diagnostic LinkedIn — ${a.nom || 'Résultats'}`,
+      html: buildEmailHtml(a, linkedin_url)
+    })
+  });
+  if (!resp.ok) console.error('Resend error:', resp.status, await resp.text());
+}
+
+function buildEmailHtml(a, linkedin_url) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><style>
+  body{font-family:-apple-system,sans-serif;background:#f5f5f5;margin:0;padding:0}
+  .wrap{max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden}
+  .header{background:#1a2840;padding:32px;text-align:center}
+  .header h1{color:#fff;margin:0;font-size:22px}
+  .header p{color:#aaa;margin:8px 0 0;font-size:14px}
+  .body{padding:32px}
+  .section{margin-bottom:24px}
+  .section h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0 0 10px}
+  .card{background:#f9f9f9;border-radius:8px;padding:16px;font-size:14px;color:#333;line-height:1.7}
+  .positif{color:#16a34a;margin:4px 0}
+  .negatif{color:#dc2626;margin:4px 0}
+  .reco{border-left:3px solid #1a2840;padding-left:12px;margin-bottom:10px;font-size:14px;color:#333;line-height:1.6}
+  .footer{padding:24px 32px;border-top:1px solid #eee;font-size:12px;color:#aaa;text-align:center}
+  .footer a{color:#1a2840}
+</style></head>
+<body><div class="wrap">
+  <div class="header">
+    <h1>Votre diagnostic LinkedIn</h1>
+    <p>${a.nom || ''} · ${a.titre || ''}</p>
+  </div>
+  <div class="body">
+    <p style="font-size:15px;color:#333;line-height:1.7;margin-bottom:24px">${a.intro || ''}</p>
+    <div class="section"><h2>Titre du profil</h2><div class="card">${a.titre_analyse || ''}</div></div>
+    <div class="section"><h2>À propos</h2><div class="card">${a.about_analyse || ''}</div></div>
+    <div class="section"><h2>Points forts & axes d'amélioration</h2><div class="card">
+      ${[1,2,3].map(i => a[`diag_positif_${i}`] ? `<p class="positif">✓ ${a[`diag_positif_${i}`]}</p>` : '').join('')}
+      ${[1,2,3].map(i => a[`diag_negatif_${i}`] ? `<p class="negatif">✗ ${a[`diag_negatif_${i}`]}</p>` : '').join('')}
+    </div></div>
+    <div class="section"><h2>Recommandations prioritaires</h2>
+      ${[1,2,3,4].map(i => a[`reco${i}`] ? `<div class="reco">${a[`reco${i}`]}</div>` : '').join('')}
+    </div>
+  </div>
+  <div class="footer">
+    <p>Diagnostic pour <a href="${linkedin_url}">${linkedin_url}</a></p>
+  </div>
+</div></body></html>`;
+}
