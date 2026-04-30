@@ -73,8 +73,11 @@ JSON à remplir (TOUS les champs, analyses précises et concrètes):
       expiration: Math.floor(Date.now() / 1000) + 3600
     });
 
-    // 4. Envoi email via Resend
-    await sendResend(email, a, linkedin_url);
+    // 4. Envoi emails via Resend
+    await Promise.all([
+      sendResend(email, a, linkedin_url),
+      sendNotification(email, a, linkedin_url)
+    ]);
 
   } catch (err) {
     console.error('analyze-background error:', err);
@@ -98,44 +101,192 @@ async function sendResend(email, a, linkedin_url) {
   if (!resp.ok) console.error('Resend error:', resp.status, await resp.text());
 }
 
+async function sendNotification(email, a, linkedin_url) {
+  const notifyEmail = 'thomas.servais@servais-consulting.com';//'laurent@sherpact.fr';
+  if (!notifyEmail) return;
+
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM || 'Sherpact <diagnostic@sherpact.com>',
+      to: notifyEmail,
+      subject: `Nouveau diagnostic — ${email}`,
+      html: `<p><strong>Nouveau diagnostic soumis</strong></p>
+<p>Email : ${email}<br>Profil : <a href="${linkedin_url}">${linkedin_url}</a><br>Date : ${new Date().toLocaleString('fr-FR')}</p>
+<hr style="border:none;border-top:1px solid #e8e4dc;margin:20px 0">
+${buildEmailHtml(a, linkedin_url)}`
+    })
+  });
+  if (!resp.ok) console.error('Resend notification error:', resp.status, await resp.text());
+}
+
 function buildEmailHtml(a, linkedin_url) {
-  return `<!DOCTYPE html>
-<html lang="fr">
-<head><meta charset="UTF-8"><style>
-  body{font-family:-apple-system,sans-serif;background:#f5f5f5;margin:0;padding:0}
-  .wrap{max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden}
-  .header{background:#1a2840;padding:32px;text-align:center}
-  .header h1{color:#fff;margin:0;font-size:22px}
-  .header p{color:#aaa;margin:8px 0 0;font-size:14px}
-  .body{padding:32px}
-  .section{margin-bottom:24px}
-  .section h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0 0 10px}
-  .card{background:#f9f9f9;border-radius:8px;padding:16px;font-size:14px;color:#333;line-height:1.7}
-  .positif{color:#16a34a;margin:4px 0}
-  .negatif{color:#dc2626;margin:4px 0}
-  .reco{border-left:3px solid #1a2840;padding-left:12px;margin-bottom:10px;font-size:14px;color:#333;line-height:1.6}
-  .footer{padding:24px 32px;border-top:1px solid #eee;font-size:12px;color:#aaa;text-align:center}
-  .footer a{color:#1a2840}
-</style></head>
+  const s = `
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f4f4;margin:0;padding:0}
+    .wrap{max-width:640px;margin:24px auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0}
+    .header{background:#1a2840;padding:28px 32px}
+    .header h1{color:#fff;margin:0 0 4px;font-size:20px;font-weight:600}
+    .header p{color:#94a3b8;margin:0;font-size:13px}
+    .intro{padding:24px 32px;background:#f8f9fb;border-bottom:1px solid #e8e8e8;font-size:14px;color:#444;line-height:1.7}
+    .bloc{padding:24px 32px;border-bottom:1px solid #eee}
+    .bloc-title{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#888;font-weight:600;margin:0 0 16px}
+    .persona{background:#f9f9f9;border:1px solid #eee;border-radius:6px;padding:14px 16px;margin-bottom:10px}
+    .persona-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em}
+    .bv{background:#dbeafe;color:#1d4ed8}
+    .bp{background:#fce7f3;color:#be185d}
+    .bs{background:#fef9c3;color:#92400e}
+    .persona-name{font-weight:600;font-size:14px;color:#111;margin-bottom:6px}
+    .persona-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 2px}
+    .persona-val{font-size:13px;color:#333;line-height:1.6}
+    .persona-verdict{font-size:13px;color:#555;font-style:italic;margin-top:8px;padding-top:8px;border-top:1px solid #eee}
+    .algo{background:#f0f4ff;border-radius:6px;padding:14px 16px;margin-top:12px}
+    .algo-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6366f1;font-weight:600;margin-bottom:10px}
+    .algo-item{font-size:13px;color:#333;line-height:1.6;padding:4px 0;border-bottom:1px solid #e0e4f0}
+    .algo-item:last-child{border-bottom:none}
+    .algo-kw{font-weight:600;color:#4f46e5}
+    .algo-note{font-size:12px;color:#6366f1;font-style:italic;margin-top:10px}
+    .sig-item{padding:12px 0;border-bottom:1px solid #f0f0f0}
+    .sig-item:last-child{border-bottom:none}
+    .sig-tag{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;font-weight:600;margin-bottom:4px}
+    .sig-quote{font-size:13px;color:#555;font-style:italic;margin-bottom:6px;padding-left:10px;border-left:2px solid #ddd}
+    .sig-read{font-size:13px;color:#333;line-height:1.6}
+    .chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:#ede9fe;color:#6d28d9;margin:4px 4px 0 0}
+    .reco-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+    .reco-item{background:#f9f9f9;border:1px solid #eee;border-radius:6px;padding:12px}
+    .reco-who{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px;font-weight:600}
+    .reco-text{font-size:13px;color:#333;line-height:1.6}
+    .diag-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+    .diag-col-title{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px}
+    .diag-col-left .diag-col-title{color:#16a34a}
+    .diag-col-right .diag-col-title{color:#dc2626}
+    .diag-item{font-size:13px;color:#333;line-height:1.6;padding:4px 0;padding-left:14px;position:relative}
+    .footer{padding:20px 32px;background:#f8f9fb;font-size:12px;color:#aaa;text-align:center}
+    .footer a{color:#1a2840}
+  `;
+
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><style>${s}</style></head>
 <body><div class="wrap">
+
   <div class="header">
-    <h1>Votre diagnostic LinkedIn</h1>
-    <p>${a.nom || ''} · ${a.titre || ''}</p>
+    <h1>${a.nom || ''}</h1>
+    <p>${a.titre || ''} · ${a.entreprise || ''} · ${a.localisation || ''}</p>
   </div>
-  <div class="body">
-    <p style="font-size:15px;color:#333;line-height:1.7;margin-bottom:24px">${a.intro || ''}</p>
-    <div class="section"><h2>Titre du profil</h2><div class="card">${a.titre_analyse || ''}</div></div>
-    <div class="section"><h2>À propos</h2><div class="card">${a.about_analyse || ''}</div></div>
-    <div class="section"><h2>Points forts & axes d'amélioration</h2><div class="card">
-      ${[1,2,3].map(i => a[`diag_positif_${i}`] ? `<p class="positif">✓ ${a[`diag_positif_${i}`]}</p>` : '').join('')}
-      ${[1,2,3].map(i => a[`diag_negatif_${i}`] ? `<p class="negatif">✗ ${a[`diag_negatif_${i}`]}</p>` : '').join('')}
-    </div></div>
-    <div class="section"><h2>Recommandations prioritaires</h2>
-      ${[1,2,3,4].map(i => a[`reco${i}`] ? `<div class="reco">${a[`reco${i}`]}</div>` : '').join('')}
+
+  <div class="intro">${a.intro || ''}</div>
+
+  <!-- BLOC 1 : Personas -->
+  <div class="bloc">
+    <div class="bloc-title">Bloc 1 — Personas attirés par le profil</div>
+
+    <div class="persona">
+      <div><span class="persona-badge bv">Voulu</span></div>
+      <div class="persona-name">${a.p1_nom || ''}</div>
+      <div class="persona-label">Qui</div><div class="persona-val">${a.p1_qui || ''}</div>
+      <div class="persona-label">Ce qu'il perçoit</div><div class="persona-val">${a.p1_percoit || ''}</div>
+      <div class="persona-verdict">${a.p1_verdict || ''}</div>
+    </div>
+
+    <div class="persona">
+      <div><span class="persona-badge bv">Voulu</span></div>
+      <div class="persona-name">${a.p2_nom || ''}</div>
+      <div class="persona-label">Qui</div><div class="persona-val">${a.p2_qui || ''}</div>
+      <div class="persona-label">Ce qu'il perçoit</div><div class="persona-val">${a.p2_percoit || ''}</div>
+      <div class="persona-verdict">${a.p2_verdict || ''}</div>
+    </div>
+
+    <div class="persona">
+      <div><span class="persona-badge bp">Parasite</span></div>
+      <div class="persona-name">${a.p3_nom || ''}</div>
+      <div class="persona-label">Qui</div><div class="persona-val">${a.p3_qui || ''}</div>
+      <div class="persona-label">Ce qu'il perçoit</div><div class="persona-val">${a.p3_percoit || ''}</div>
+      <div class="persona-verdict">${a.p3_verdict || ''}</div>
+    </div>
+
+    <div class="persona">
+      <div><span class="persona-badge bs">Possible · à valider</span></div>
+      <div class="persona-name">${a.p4_nom || ''}</div>
+      <div class="persona-label">Qui</div><div class="persona-val">${a.p4_qui || ''}</div>
+      <div class="persona-label">Pourquoi il ne le voit pas</div><div class="persona-val">${a.p4_blocage || ''}</div>
+      <div class="persona-verdict">${a.p4_verdict || ''}</div>
+    </div>
+
+    <div class="algo">
+      <div class="algo-title">Visibilité algorithmique</div>
+      ${[1,2,3,4].map(i => a[`algo_kw${i}`] ? `<div class="algo-item"><span class="algo-kw">${a[`algo_kw${i}`]}</span> — ${a[`algo_text${i}`] || ''}</div>` : '').join('')}
+      ${a.algo_note ? `<div class="algo-note">${a.algo_note}</div>` : ''}
     </div>
   </div>
+
+  <!-- BLOC 2 : Ce que le profil vend -->
+  <div class="bloc">
+    <div class="bloc-title">Bloc 2 — Ce que le profil vend réellement</div>
+
+    <div class="sig-item">
+      <div class="sig-tag">Titre</div>
+      ${a.titre_citation ? `<div class="sig-quote">"${a.titre_citation}"</div>` : ''}
+      <div class="sig-read">${a.titre_analyse || ''}</div>
+      ${a.titre_chip ? `<span class="chip">${a.titre_chip}</span>` : ''}
+    </div>
+
+    <div class="sig-item">
+      <div class="sig-tag">About complet</div>
+      ${a.about_citation ? `<div class="sig-quote">"${a.about_citation}"</div>` : ''}
+      <div class="sig-read">${a.about_analyse || ''}</div>
+      ${a.about_chip1 ? `<span class="chip">${a.about_chip1}</span>` : ''}
+      ${a.about_chip2 ? `<span class="chip">${a.about_chip2}</span>` : ''}
+    </div>
+
+    <div class="sig-item">
+      <div class="sig-tag">Expériences récentes</div>
+      <div class="sig-read">${a.exp_analyse || ''}</div>
+    </div>
+
+    <div class="sig-item">
+      <div class="sig-tag">Posts récents</div>
+      <div class="sig-read">${a.posts_analyse || ''}</div>
+    </div>
+
+    <div class="sig-item">
+      <div class="sig-tag">Bannière + photo</div>
+      <div class="sig-read">${a.banniere_analyse || ''}</div>
+    </div>
+  </div>
+
+  <!-- BLOC 3 : Ce que chaque persona retient -->
+  <div class="bloc">
+    <div class="bloc-title">Bloc 3 — Ce que chaque persona retient</div>
+
+    <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:16px">
+      <tr>
+        ${[1,2,3,4].map(i => `<td width="25%" style="padding:8px;vertical-align:top;background:#f9f9f9;border:1px solid #eee;border-radius:4px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#888;font-weight:600;margin-bottom:6px">${a[`p${i}_nom`] || ''}</div>
+          <div style="font-size:13px;color:#333;line-height:1.5">${a[`reco${i}`] || ''}</div>
+        </td>`).join('')}
+      </tr>
+    </table>
+
+    <div class="bloc-title" style="margin-top:16px">Premier diagnostic</div>
+    <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
+      <tr>
+        <td width="50%" style="padding-right:12px;vertical-align:top">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#16a34a;font-weight:600;margin-bottom:8px">Ce que le profil fait</div>
+          ${[1,2,3].map(i => a[`diag_positif_${i}`] ? `<div style="font-size:13px;color:#333;line-height:1.6;padding:3px 0 3px 14px;border-left:2px solid #16a34a;margin-bottom:6px">${a[`diag_positif_${i}`]}</div>` : '').join('')}
+        </td>
+        <td width="50%" style="padding-left:12px;vertical-align:top">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#dc2626;font-weight:600;margin-bottom:8px">Ce que le profil ne fait pas</div>
+          ${[1,2,3].map(i => a[`diag_negatif_${i}`] ? `<div style="font-size:13px;color:#333;line-height:1.6;padding:3px 0 3px 14px;border-left:2px solid #dc2626;margin-bottom:6px">${a[`diag_negatif_${i}`]}</div>` : '').join('')}
+        </td>
+      </tr>
+    </table>
+  </div>
+
   <div class="footer">
     <p>Diagnostic pour <a href="${linkedin_url}">${linkedin_url}</a></p>
   </div>
+
 </div></body></html>`;
 }
